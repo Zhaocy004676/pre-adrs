@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2c6e8f">
+<title>围术期药品不良反应预测模型</title>
+<style>
+  :root{
+    --main:#2c6e8f; --text:#22303a; --muted:#6d7b86; --line:#dfe6ec; --bg:#f2f5f7;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif;
+    font-size:15px; line-height:1.65; padding-bottom:36px;
+  }
+  .wrap{ max-width:560px; margin:0 auto; }
+
+  header{
+    background:linear-gradient(135deg,#2c6e8f,#3f95b3);
+    color:#fff; padding:24px 20px 28px; text-align:center;
+    border-radius:0 0 20px 20px;
+  }
+  header h1{ font-size:19px; margin:0 0 7px; font-weight:600; letter-spacing:.5px; }
+  header p{ margin:0; font-size:12px; opacity:.87; line-height:1.6; }
+
+  .card{
+    background:#fff; margin:14px 14px 0; padding:16px 16px 20px;
+    border-radius:14px; box-shadow:0 2px 10px rgba(24,50,65,.06);
+  }
+  .sec{ font-size:14px; font-weight:600; color:var(--main);
+        margin:0 0 14px; padding-left:10px; border-left:3px solid var(--main); }
+
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:14px; color:var(--muted); margin-bottom:6px; }
+  input[type=number]{
+    width:100%; padding:11px 13px; font-size:16px; color:var(--text);
+    border:1px solid var(--line); border-radius:10px; background:#fbfcfd; outline:none;
+  }
+  input[type=number]:focus{ border-color:var(--main); background:#fff; }
+  .hint{ font-size:12px; color:var(--muted); margin-top:5px; }
+
+  .group{ margin-bottom:16px; }
+  .gl{ font-size:14px; color:var(--muted); margin-bottom:8px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{
+    border:1px solid var(--line); background:#fff; color:var(--text);
+    font-size:14px; padding:8px 15px; border-radius:20px; cursor:pointer;
+    transition:.15s; font-family:inherit; line-height:1.3;
+  }
+  .chip.on{ background:var(--main); border-color:var(--main); color:#fff; }
+  .chip:active{ transform:scale(.97); }
+
+  select{
+    width:100%; padding:12px 13px; font-size:16px; color:var(--text);
+    border:1px solid var(--line); border-radius:10px; background:#fbfcfd;
+    outline:none; appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' stroke='%236d7b86' stroke-width='1.5' fill='none'/></svg>");
+    background-repeat:no-repeat; background-position:right 14px center;
+  }
+  select:focus{ border-color:var(--main); background-color:#fff; }
+
+  .btns{ margin:18px 14px 0; display:flex; gap:10px; }
+  .primary{
+    flex:1; padding:15px; font-size:17px; font-weight:600; color:#fff;
+    background:var(--main); border:0; border-radius:12px; cursor:pointer;
+    font-family:inherit; box-shadow:0 4px 14px rgba(44,110,143,.25);
+  }
+  .primary:active{ opacity:.9; transform:translateY(1px); }
+  .ghost{
+    flex:0 0 90px; padding:15px; font-size:15px; color:var(--main);
+    background:#fff; border:1px solid var(--line); border-radius:12px;
+    cursor:pointer; font-family:inherit;
+  }
+  .warn{ margin:10px 16px 0; font-size:13px; color:#c0392b; display:none; }
+
+  #results{ display:none; }
+  .rhead{ margin:22px 16px 0; font-size:14px; font-weight:600; color:var(--main);
+          padding-left:10px; border-left:3px solid var(--main); }
+  .rcard{
+    background:#fff; margin:12px 14px 0; padding:18px 16px;
+    border-radius:14px; box-shadow:0 2px 10px rgba(24,50,65,.06);
+  }
+  .rtop{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .rname{ font-size:15px; font-weight:600; }
+  .rval{ font-size:30px; font-weight:700; color:var(--main); letter-spacing:-.5px; white-space:nowrap; }
+  .rval small{ font-size:14px; font-weight:400; color:var(--muted); margin-left:1px; }
+  .pill{ display:inline-block; padding:4px 13px; border-radius:14px; font-size:13px; font-weight:600; margin-top:10px; }
+  .low{ background:#e7f6ed; color:#1e874b; }
+  .mid{ background:#fff4e0; color:#b9770e; }
+  .high{ background:#fdeaea; color:#c0392b; }
+  .bar{ height:6px; background:#eef1f4; border-radius:3px; margin:14px 0 7px; overflow:hidden; }
+  .bar i{ display:block; height:100%; width:0; border-radius:3px; transition:width .5s ease; }
+  .scale{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
+
+  footer{
+    margin:28px 18px 0; text-align:center; font-size:13px; color:var(--muted); line-height:1.9;
+  }
+  footer .org{ color:var(--text); font-size:14px; }
+  .disclaimer{
+    margin:16px 14px 0; background:#fffbea; border:1px solid #f3e3a8;
+    color:#8a6d1f; font-size:12.5px; line-height:1.75; padding:12px 14px; border-radius:10px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>围术期药品不良反应预测模型</h1>
+    <p>输入患者信息与围术期用药，计算五类不良反应的发生概率</p>
+  </header>
+
+  <div class="card">
+    <div class="sec">基本信息</div>
+    <div class="field">
+      <label for="age">年龄（岁）</label>
+      <input id="age" type="number" inputmode="decimal" min="0" max="120" placeholder="请输入实际年龄">
+      <div class="hint">年龄 &gt; 65 岁自动按“老年”计入模型</div>
+    </div>
+    <div class="group" id="g-sex" style="margin-bottom:0">
+      <div class="gl">性别</div>
+      <div class="chips"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec">器官功能与体型</div>
+    <div class="group" id="g-liver"><div class="gl">肝功能异常</div><div class="chips"></div></div>
+    <div class="group" id="g-kidney"><div class="gl">肾功能异常</div><div class="chips"></div></div>
+    <div class="group" id="g-immune"><div class="gl">免疫功能异常</div><div class="chips"></div></div>
+    <div class="group" id="g-obesity" style="margin-bottom:0"><div class="gl">肥胖</div><div class="chips"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="sec">手术与合并疾病</div>
+    <div class="group">
+      <div class="gl">手术部位</div>
+      <select id="site"><option value="">请选择手术部位</option></select>
+    </div>
+    <div class="group" id="g-disease" style="margin-bottom:0">
+      <div class="gl">合并疾病（可多选）</div>
+      <div class="chips"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sec">围术期用药与麻醉</div>
+    <div class="group" id="g-drug">
+      <div class="gl">围术期用药（可多选）</div>
+      <div class="chips"></div>
+    </div>
+    <div class="group" id="g-anes" style="margin-bottom:0">
+      <div class="gl">麻醉方式</div>
+      <div class="chips"></div>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="primary" onclick="calc()">计算风险</button>
+    <button class="ghost" onclick="resetAll()">重置</button>
+  </div>
+  <div class="warn" id="warn"></div>
+
+  <div id="results"></div>
+
+  <div class="disclaimer">
+    本模型为预测模型，仍在研究阶段，谨慎使用。计算结果仅作为临床用药决策的参考，不能替代医师与药师的个体化评估。
+  </div>
+
+  <footer>
+    <div class="org">中国医科大学附属第一医院&nbsp;药学部</div>
+    <div>作者：赵春阳</div>
+  </footer>
+</div>
+
+<script>
+/* ===================== 基础选项 ===================== */
+var SITES = ['产科手术','肺部手术','妇科手术','肝胆胰手术','肛肠手术','骨手术','甲状腺手术','泌尿手术',
+             '器官移植手术','乳腺手术','神经手术','胃肠道手术','心脏手术','血管手术','眼部手术','整形手术',
+             '重症手术','耳鼻喉手术'];
+
+var DISEASES = ['肿瘤','胃肠道疾病','呼吸系统疾病','心血管系统疾病','糖尿病','甲状腺疾病','泌尿系统疾病'];
+
+var DRUGS = ['七氟烷','地氟烷','氟比洛芬酯','瑞芬太尼','盐酸羟考酮','地佐辛','纳美芬','布托啡诺',
+             '咪达唑仑','右美托咪定','依托咪酯','地塞米松','丙泊酚','阿曲库铵','罗库溴铵'];
+
+/* 五个模型：base 常数项；ageCoef 年龄连续项系数；terms 各变量系数映射
+   某变量未出现在某模型中时，其系数按 0 处理 */
+var MODELS = [
+  { key:'ponv', name:'围术期恶心呕吐', short:'PONV',
+    base:-4.801, ageCoef:0,
+    terms:[
+      {t:'sex', map:{'男':-0.116,'女':0}},
+      {t:'old', map:{'是':-0.179,'否':0}},
+      {t:'liver', map:{'是':0.523,'否':0}},
+      {t:'kidney', map:{'是':0.284,'否':0}},
+      {t:'immune', map:{'是':2.341,'否':0}},
+      {t:'site', map:{'产科手术':1.274,'肺部手术':-2.733,'妇科手术':-2.127,'肝胆胰手术':-1.506,
+                      '肛肠手术':-1.269,'骨手术':-1.297,'甲状腺手术':0.77,'泌尿手术':-3.273,
+                      '器官移植手术':-1.419,'乳腺手术':-2.985,'神经手术':-1.573,'胃肠道手术':-2.033,
+                      '心脏手术':0.807,'血管手术':-1.82,'眼部手术':0.902,'整形手术':-0.538,'重症手术':0}},
+      {t:'disease', map:{'肿瘤':0.645,'胃肠道疾病':0.107,'呼吸系统疾病':0.611,'心血管系统疾病':-0.9,
+                         '糖尿病':0.449,'甲状腺疾病':-0.417,'泌尿系统疾病':-0.299}},
+      {t:'drug', map:{'七氟烷':1.73,'地氟烷':1.994,'氟比洛芬酯':0.232,'瑞芬太尼':0.374,'地佐辛':0.311,
+                      '纳美芬':0.199,'布托啡诺':-0.458,'咪达唑仑':0.269,'依托咪酯':0.194,
+                      '地塞米松':0.817,'丙泊酚':0.766}},
+      {t:'anes', map:{'全静脉麻醉':1.289,'静吸复合麻醉':0}}
+    ]},
+  { key:'poc', name:'围术期便秘', short:'POC',
+    base:-0.231, ageCoef:0,   /* 已删除“实际年龄”连续项，仅保留老年（>65岁）哑变量 */
+    terms:[
+      {t:'old', map:{'是':0.097,'否':0}},
+      {t:'obesity', map:{'是':0.517,'否':0}},
+      {t:'immune', map:{'是':0.255,'否':0}},
+      {t:'site', map:{'产科手术':0.524,'耳鼻喉手术':2.926,'肝胆胰手术':1.468,'甲状腺手术':1.12,
+                      '泌尿手术':0.761,'器官移植手术':0.448,'乳腺手术':2.369,'神经手术':-0.984,
+                      '胃肠道手术':0.24,'心脏手术':-2.091,'血管手术':0.908,'眼部手术':2.503,
+                      '整形手术':2.688,'重症手术':0}},
+      {t:'disease', map:{'胃肠道疾病':0.338,'呼吸系统疾病':0.29,'甲状腺疾病':-2.332,'泌尿系统疾病':0.263}},
+      {t:'drug', map:{'瑞芬太尼':0.152,'盐酸羟考酮':0.47,'地佐辛':0.562,'纳美芬':0.669,'布托啡诺':-0.242,
+                      '咪达唑仑':0.383,'右美托咪定':0.138,'依托咪酯':0.073,'地塞米松':0.303,'丙泊酚':0.558}},
+      {t:'anes', map:{'全静脉麻醉':-0.443,'静吸复合麻醉':0}}
+    ]},
+  { key:'pour', name:'围术期尿潴留', short:'POUR',
+    base:-7.71, ageCoef:1.49, ageScale:0.1,   /* 年龄项按每10岁折算 */
+    note:'注：本项年龄按每 10 岁折算计入',
+    terms:[
+      {t:'old', map:{'是':0.258,'否':0}},
+      {t:'obesity', map:{'是':1.49,'否':0}},
+      {t:'liver', map:{'是':0.999,'否':0}},
+      {t:'kidney', map:{'是':1.183,'否':0}},
+      {t:'immune', map:{'是':0.564,'否':0}},
+      {t:'disease', map:{'胃肠道疾病':0.984,'呼吸系统疾病':-0.677,'心血管系统疾病':0.26,
+                         '糖尿病':0.627,'甲状腺疾病':-1.862}},
+      {t:'drug', map:{'氟比洛芬酯':0.096,'瑞芬太尼':-0.163,'盐酸羟考酮':0.977,'地佐辛':0.256,
+                      '布托啡诺':0.332,'右美托咪定':0.269,'依托咪酯':0.253,'地塞米松':0.555,
+                      '丙泊酚':0.259,'阿曲库铵':-2.698,'罗库溴铵':2.831}}
+    ]},
+  { key:'del', name:'围术期谵妄', short:'POD',
+    base:-2.197, ageCoef:0,   /* 截距按目标人群 10% 发生率校准（ln(0.1/0.9)） */
+    note:'注：截距按目标人群 10% 发生率校准',
+    terms:[
+      {t:'sex', map:{'男':1.039,'女':0}},
+      {t:'obesity', map:{'是':0.923,'否':0}},
+      {t:'liver', map:{'是':1.053,'否':0}},
+      {t:'disease', map:{'肿瘤':-0.761,'胃肠道疾病':0.458,'糖尿病':0.949,'甲状腺疾病':0.535}},
+      {t:'drug', map:{'地氟烷':0.814,'氟比洛芬酯':-1.033,'纳美芬':1.049,'右美托咪定':1.7,'依托咪酯':0.752}}
+    ]},
+  { key:'pord', name:'围术期呼吸抑制', short:'PORD',
+    base:-4.196, ageCoef:0,
+    terms:[
+      {t:'disease', map:{'心血管系统疾病':2.129}},
+      {t:'drug', map:{'右美托咪定':0.745,'依托咪酯':0.96,'地塞米松':0.715}}
+    ]}
+];
+
+/* ===================== 状态 ===================== */
+var state = { sex:'', liver:'否', kidney:'否', immune:'否', obesity:'否',
+              site:'', disease:[], drug:[], anes:'' };
+
+/* ===================== 选项渲染 ===================== */
+function makeChips(container, options, multi, key){
+  var box = container.querySelector('.chips');
+  options.forEach(function(opt){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chip';
+    btn.textContent = opt;
+    if (!multi && state[key] === opt) btn.classList.add('on');
+    btn.onclick = function(){
+      if (multi){
+        var i = state[key].indexOf(opt);
+        if (i > -1) state[key].splice(i, 1); else state[key].push(opt);
+        btn.classList.toggle('on');
+      } else {
+        state[key] = opt;
+        var all = box.querySelectorAll('.chip');
+        for (var j = 0; j < all.length; j++) all[j].classList.remove('on');
+        btn.classList.add('on');
+      }
+    };
+    box.appendChild(btn);
+  });
+}
+
+makeChips(document.getElementById('g-sex'), ['男','女'], false, 'sex');
+makeChips(document.getElementById('g-liver'), ['是','否'], false, 'liver');
+makeChips(document.getElementById('g-kidney'), ['是','否'], false, 'kidney');
+makeChips(document.getElementById('g-immune'), ['是','否'], false, 'immune');
+makeChips(document.getElementById('g-obesity'), ['是','否'], false, 'obesity');
+makeChips(document.getElementById('g-disease'), DISEASES, true, 'disease');
+makeChips(document.getElementById('g-drug'), DRUGS, true, 'drug');
+makeChips(document.getElementById('g-anes'), ['全静脉麻醉','静吸复合麻醉'], false, 'anes');
+
+/* 默认“否”高亮 */
+['liver','kidney','immune','obesity'].forEach(function(k){
+  var chips = document.getElementById('g-' + k).querySelectorAll('.chip');
+  for (var i = 0; i < chips.length; i++){
+    if (chips[i].textContent === state[k]) chips[i].classList.add('on');
+  }
+});
+
+/* 手术部位下拉 */
+(function(){
+  var sel = document.getElementById('site');
+  SITES.forEach(function(s){
+    var o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  });
+  sel.onchange = function(){ state.site = sel.value; };
+})();
+
+/* ===================== 计算 ===================== */
+function logitToP(z){ return 1 / (1 + Math.exp(-z)); }
+
+function coefOf(term, isOld){
+  if (term.t === 'old')
+    return (isOld ? term.map['是'] : term.map['否']) || 0;
+  if (term.t === 'site')
+    return term.map[state.site] || 0;
+  if (term.t === 'disease')
+    return state.disease.reduce(function(s, d){ return s + (term.map[d] || 0); }, 0);
+  if (term.t === 'drug')
+    return state.drug.reduce(function(s, d){ return s + (term.map[d] || 0); }, 0);
+  if (term.t === 'sex')
+    return term.map[state.sex] || 0;
+  if (term.t === 'anes')
+    return term.map[state.anes] || 0;
+  return term.map[state[term.t]] || 0;   /* liver / kidney / immune / obesity */
+}
+
+function riskLevel(p){
+  if (p > 0.5)   return { label:'高风险', cls:'high', color:'#c0392b' };
+  if (p >= 0.2)  return { label:'中风险', cls:'mid',  color:'#e0a020' };
+  return { label:'低风险', cls:'low', color:'#1e874b' };
+}
+
+function calc(){
+  var ageRaw = document.getElementById('age').value.trim();
+  var age = parseFloat(ageRaw);
+  var warn = document.getElementById('warn');
+  var msg = '';
+  if (ageRaw === '' || isNaN(age) || age < 0 || age > 120) msg = '请填写有效的年龄（0～120 岁）。';
+  else if (!state.sex)  msg = '请选择性别。';
+  else if (!state.site) msg = '请选择手术部位。';
+  else if (!state.anes) msg = '请选择麻醉方式。';
+
+  if (msg){
+    warn.textContent = msg;
+    warn.style.display = 'block';
+    return;
+  }
+  warn.style.display = 'none';
+
+  var isOld = age > 65;
+  var box = document.getElementById('results');
+  box.innerHTML = '<div class="rhead">预测结果（发生概率与风险等级）</div>';
+  box.style.display = 'block';
+
+  MODELS.forEach(function(m){
+    var z = m.base + m.ageCoef * age * (m.ageScale || 1);
+    m.terms.forEach(function(term){ z += coefOf(term, isOld); });
+
+    var pPct = logitToP(z) * 100;
+    var risk = riskLevel(pPct / 100);
+
+    var card = document.createElement('div');
+    card.className = 'rcard';
+    card.innerHTML =
+      '<div class="rtop">' +
+        '<span class="rname">' + m.name + '</span>' +
+        '<span class="rval">' + pPct.toFixed(1) + '<small>%</small></span>' +
+      '</div>' +
+      '<span class="pill ' + risk.cls + '">' + risk.label + '</span>' +
+      '<div class="bar"><i style="background:' + risk.color + '"></i></div>' +
+      '<div class="scale"><span>0%</span><span>低&lt;20%</span><span>中20–50%</span><span>高&gt;50%</span><span>100%</span></div>' +
+      (m.note ? '<div class="scale" style="margin-top:8px;justify-content:flex-start">' + m.note + '</div>' : '');
+    box.appendChild(card);
+
+    var fill = card.querySelector('.bar i');
+    setTimeout(function(){
+      fill.style.width = Math.min(100, Math.max(2, pPct)) + '%';
+    }, 60);
+  });
+
+  setTimeout(function(){
+    box.scrollIntoView({ behavior:'smooth', block:'start' });
+  }, 120);
+}
+
+function resetAll(){
+  state.sex = ''; state.liver = '否'; state.kidney = '否'; state.immune = '否'; state.obesity = '否';
+  state.site = ''; state.disease = []; state.drug = []; state.anes = '';
+  document.getElementById('age').value = '';
+  document.getElementById('site').value = '';
+  var chips = document.querySelectorAll('.chip');
+  for (var i = 0; i < chips.length; i++) chips[i].classList.remove('on');
+  ['liver','kidney','immune','obesity'].forEach(function(k){
+    var cs = document.getElementById('g-' + k).querySelectorAll('.chip');
+    for (var j = 0; j < cs.length; j++){
+      if (cs[j].textContent === '否') cs[j].classList.add('on');
+    }
+  });
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('warn').style.display = 'none';
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+</script>
+</body>
+</html>
